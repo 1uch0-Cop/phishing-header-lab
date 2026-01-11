@@ -11,7 +11,7 @@ Este proyecto está diseñado para ser utilizado en unidades curriculares de cib
 
 ---
 
-## 🔍 Funcionalidad
+## Funcionalidad
 
 El laboratorio permite:
 
@@ -25,7 +25,7 @@ Todo funciona **100% en el navegador del usuario**, sin enviar datos a servidore
 
 ---
 
-## 🧪 Ejemplos incluidos
+## Ejemplos incluidos
 
 El laboratorio incorpora ejemplos predefinidos para uso docente:
 
@@ -37,7 +37,7 @@ Estos permiten generar comparación inmediata entre escenarios.
 
 ---
 
-## 🎓 Uso en el aula (sugerencia docente)
+## Uso en el aula (sugerencia docente)
 
 Actividad recomendada:
 
@@ -58,7 +58,7 @@ Resultados de aprendizaje:
 
 ---
 
-## 🛠 Tecnologías utilizadas
+## Tecnologías utilizadas
 
 - **HTML5** + **CSS3**
 - **JavaScript (ES6)**
@@ -68,7 +68,7 @@ Resultados de aprendizaje:
 
 ---
 
-## 🌐 Publicación como página web
+## Publicación como página web
 
 Este proyecto puede publicarse fácilmente mediante GitHub Pages:
 
@@ -80,5 +80,5 @@ Este proyecto puede publicarse fácilmente mediante GitHub Pages:
 
 ---
 
-## 📁 Estructura del proyecto
-
+**Licencia**
+Uso educativo abierto. Puede reutilizarse, adaptarse y distribuirse en contextos escolares.
