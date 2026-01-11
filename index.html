@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Phishing Lab – Analizador de cabeceras de correo</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 20px;
+            max-width: 1000px;
+        }
+        textarea {
+            width: 100%;
+            height: 260px;
+            font-family: "Consolas", "Fira Code", monospace;
+            font-size: 13px;
+            white-space: pre;
+        }
+        .btn {
+            padding: 8px 16px;
+            cursor: pointer;
+            border: 1px solid #444;
+            background: #f5f5f5;
+            margin-right: 8px;
+        }
+        .btn-secondary {
+            background: #e9f0ff;
+        }
+        .card {
+            border: 1px solid #ddd;
+            padding: 16px;
+            margin-top: 20px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-right: 6px;
+        }
+        .badge-ok {
+            background: #e0f7e9;
+        }
+        .badge-warn {
+            background: #fff4e0;
+        }
+        .badge-bad {
+            background: #ffe0e0;
+        }
+        .badge-level-bajo {
+            background: #e0f7e9;
+        }
+        .badge-level-moderado {
+            background: #fff4e0;
+        }
+        .badge-level-alto {
+            background: #ffe0e0;
+        }
+        h1, h2, h3 {
+            margin-top: 0.4em;
+        }
+        details summary {
+            cursor: pointer;
+            font-weight: 600;
+        }
+        ul {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Phishing Lab – Analizador de cabeceras de correo</h1>
+    <p>
+        Recurso didáctico para trabajar cabeceras de correo electrónico en unidades de ciberseguridad:
+        analiza SPF, DKIM, DMARC y coherencia de dominios para estimar el riesgo de phishing.
+    </p>
+
+    <form id="analyzer-form">
+        <label for="headers"><strong>Cabeceras del correo:</strong></label><br>
+        <textarea id="headers" name="headers" placeholder="Pega aquí las cabeceras completas..."></textarea>
+        <br><br>
+        <button type="submit" class="btn">Analizar</button>
+        <button type="button" class="btn btn-secondary" onclick="loadExample('legitimo')">Ejemplo legítimo</button>
+        <button type="button" class="btn btn-secondary" onclick="loadExample('phishing')">Ejemplo phishing bancario</button>
+        <button type="button" class="btn btn-secondary" onclick="loadExample('bec')">Ejemplo BEC (Business Email Compromise)</button>
+    </form>
+
+    <div id="results"></div>
+
+    <div class="card">
+        <h2>Guía rápida para estudiantes</h2>
+        <ul>
+            <li><strong>1.</strong> Observa primero <em>From / Return-Path / Reply-To</em>. ¿Son del mismo dominio?</li>
+            <li><strong>2.</strong> Mira el estado de <em>SPF / DKIM / DMARC</em>. ¿Fallan o están ausentes?</li>
+            <li><strong>3.</strong> Revisa los motivos generados por la herramienta y compáralos con tu propia conclusión.</li>
+            <li><strong>4.</strong> Decide: ¿correo legítimo, phishing o posible BEC? Justifica tu decisión.</li>
+        </ul>
+    </div>
+
+    <script>
+        // --- Utilidades de análisis (portadas desde Python a JS) ---
+
+        function getHeaderField(headers, fieldName) {
+            // Busca la primera línea que empieza con "FieldName:"
+            const regex = new RegExp('^' + fieldName + ':(.*)$', 'im');
+            const match = headers.match(regex);
+            if (!match) return null;
+            return match[1].trim();
+        }
+
+        function analyzeAuthResults(headers) {
+            const authHeader = getHeaderField(headers, "Authentication-Results");
+            const result = {
+                spf: null,
+                dkim: null,
+                dmarc: null,
+                raw: authHeader
+            };
+            if (!authHeader) {
+                return result;
+            }
+
+            ["spf", "dkim", "dmarc"].forEach(mech => {
+                const regex = new RegExp(mech + '=([a-zA-Z0-9_]+)', 'i');
+                const m = authHeader.match(regex);
+                if (m) {
+                    result[mech] = m[1].toLowerCase();
+                }
+            });
+
+            return result;
+        }
+
+        function extractDomain(emailField) {
+            if (!emailField) return null;
+            const regex = /@([A-Za-z0-9.\-_]+)/;
+            const m = emailField.match(regex);
+            return m ? m[1].toLowerCase() : null;
+        }
+
+        function addReason(reasons, label, explanation) {
+            reasons.push({ label, explanation });
+        }
+
+        function riskFromAuth(auth, reasons) {
+            let score = 0;
+
+            // SPF
+            if (auth.spf === "fail") {
+                score += 2;
+                addReason(
+                    reasons,
+                    "SPF=fail",
+                    "El servidor que envió el correo NO está autorizado por el dominio según el registro SPF. " +
+                    "Es un indicador fuerte de suplantación del dominio."
+                );
+            } else if (auth.spf === "pass") {
+                addReason(
+                    reasons,
+                    "SPF=pass",
+                    "El servidor que envió el correo está autorizado por el dominio. Esto es un punto a favor de legitimidad, " +
+                    "pero no garantiza que el correo sea legítimo."
+                );
+            }
+
+            // DKIM
+            if (auth.dkim === "fail") {
+                score += 2;
+                addReason(
+                    reasons,
+                    "DKIM=fail",
+                    "La firma criptográfica DKIM no coincide con el contenido o el dominio. " +
+                    "Puede indicar manipulación del mensaje o suplantación."
+                );
+            } else if (auth.dkim === "pass") {
+                addReason(
+                    reasons,
+                    "DKIM=pass",
+                    "El mensaje está firmado criptográficamente por el dominio y la firma es válida. " +
+                    "Es una señal fuerte de integridad y autenticidad."
+                );
+            }
+
+            // DMARC
+            if (auth.dmarc === "fail") {
+                score += 1;
+                addReason(
+                    reasons,
+                    "DMARC=fail",
+                    "El dominio declara una política DMARC, pero el mensaje NO la cumple. " +
+                    "Suele indicar que el correo debería ser tratado como sospechoso por los servidores de correo."
+                );
+            } else if (auth.dmarc === "none" || auth.dmarc === null) {
+                score += 1;
+                addReason(
+                    reasons,
+                    "DMARC=" + auth.dmarc,
+                    "El dominio no tiene una política DMARC estricta (o no tiene). Esto permite más fácilmente la suplantación."
+                );
+            } else if (auth.dmarc === "pass") {
+                addReason(
+                    reasons,
+                    "DMARC=pass",
+                    "El mensaje cumple la política DMARC del dominio. Es una señal positiva de legitimidad."
+                );
+            }
+
+            return score;
+        }
+
+        function analyzeHeaders(headersText) {
+            const fromField  = getHeaderField(headersText, "From");
+            const returnPath = getHeaderField(headersText, "Return-Path");
+            const replyTo    = getHeaderField(headersText, "Reply-To");
+            const messageId  = getHeaderField(headersText, "Message-ID");
+
+            const auth = analyzeAuthResults(headersText);
+
+            let score = 0;
+            const reasons = [];
+
+            // Riesgo por autenticación
+            score += riskFromAuth(auth, reasons);
+
+            // Dominios
+            const fromDomain = extractDomain(fromField);
+            const rpDomain   = extractDomain(returnPath);
+            const rtDomain   = extractDomain(replyTo);
+            const midDomain  = extractDomain(messageId);
+
+            // From vs Return-Path
+            if (fromDomain && rpDomain && fromDomain !== rpDomain) {
+                score += 2;
+                addReason(
+                    reasons,
+                    `From (${fromDomain}) != Return-Path (${rpDomain})`,
+                    "El remitente visible (From) no coincide con el remitente real que recibe los rebotes (Return-Path). " +
+                    "Esto es típico en intentos de suplantación: el usuario ve un dominio, pero el servidor real es otro."
+                );
+            }
+
+            // From vs Reply-To
+            if (fromDomain && rtDomain && fromDomain !== rtDomain) {
+                score += 2;
+                addReason(
+                    reasons,
+                    `From (${fromDomain}) != Reply-To (${rtDomain})`,
+                    "La respuesta al correo iría a un dominio distinto del que aparece como remitente visible. " +
+                    "Técnica común en fraudes tipo BEC o phishing para desviar respuestas a una cuenta controlada por el atacante."
+                );
+            }
+
+            // Message-ID vs From (regla suave)
+            if (fromDomain && midDomain && !midDomain.includes(fromDomain)) {
+                score += 1;
+                addReason(
+                    reasons,
+                    `Message-ID (${midDomain}) ≠ From (${fromDomain})`,
+                    "El dominio que generó el Message-ID no coincide claramente con el dominio del remitente. " +
+                    "Puede indicar uso de un servicio externo o un servidor no oficial."
+                );
+            }
+
+            let riskLevel;
+            let verdict;
+
+            if (score >= 6) {
+                riskLevel = "ALTO";
+                verdict = "ALTO riesgo de phishing / suplantación. Recomendado NO hacer clic en enlaces ni abrir adjuntos sin verificación adicional.";
+            } else if (score >= 3) {
+                riskLevel = "MODERADO";
+                verdict = "Riesgo MODERADO. Existen discrepancias que deben ser revisadas manualmente antes de confiar en el mensaje.";
+            } else {
+                riskLevel = "BAJO";
+                verdict = "Bajo riesgo según cabeceras. No se observan señales fuertes de suplantación, pero siempre es recomendable revisar el contenido.";
+            }
+
+            return {
+                fromField,
+                returnPath,
+                replyTo,
+                messageId,
+                auth,
+                score,
+                riskLevel,
+                verdict,
+                reasons
+            };
+        }
+
+        // --- Renderizado en la página ---
+
+        function renderResults(result) {
+            const container = document.getElementById('results');
+            if (!result) {
+                container.innerHTML = "";
+                return;
+            }
+
+            const spf   = result.auth.spf;
+            const dkim  = result.auth.dkim;
+            const dmarc = result.auth.dmarc;
+
+            const riskClass =
+                result.riskLevel === "ALTO" ? "badge-level-alto" :
+                result.riskLevel === "MODERADO" ? "badge-level-moderado" :
+                "badge-level-bajo";
+
+            const spfClass =
+                spf === "pass" ? "badge-ok" :
+                spf === "fail" ? "badge-bad" : "badge-warn";
+
+            const dkimClass =
+                dkim === "pass" ? "badge-ok" :
+                dkim === "fail" ? "badge-bad" : "badge-warn";
+
+            const dmarcClass =
+                dmarc === "pass" ? "badge-ok" :
+                dmarc === "fail" ? "badge-bad" : "badge-warn";
+
+            let reasonsHtml = "";
+            if (result.reasons && result.reasons.length > 0) {
+                reasonsHtml += "<ul>";
+                result.reasons.forEach(r => {
+                    reasonsHtml += `<li><strong>${r.label}:</strong><br><span>${r.explanation}</span></li>`;
+                });
+                reasonsHtml += "</ul>";
+            } else {
+                reasonsHtml = "<p>Sin motivos significativos según las reglas básicas. Aun así, revisar siempre el contenido del mensaje.</p>";
+            }
+
+            container.innerHTML = `
+                <div class="card">
+                    <h2>Resultado del análisis</h2>
+                    <p>
+                        <strong>Score de riesgo:</strong> ${result.score}<br>
+                        <strong>Nivel:</strong>
+                        <span class="badge ${riskClass}">${result.riskLevel}</span>
+                    </p>
+                    <p><strong>Veredicto:</strong> ${result.verdict}</p>
+
+                    <h3>Campos clave</h3>
+                    <ul>
+                        <li><strong>From:</strong> ${result.fromField || 'No encontrado'}</li>
+                        <li><strong>Return-Path:</strong> ${result.returnPath || 'No encontrado'}</li>
+                        <li><strong>Reply-To:</strong> ${result.replyTo || 'No encontrado'}</li>
+                        <li><strong>Message-ID:</strong> ${result.messageId || 'No encontrado'}</li>
+                    </ul>
+
+                    <h3>Autenticación</h3>
+                    <p>
+                        <span class="badge ${spfClass}">SPF: ${spf || 'desconocido'}</span>
+                        <span class="badge ${dkimClass}">DKIM: ${dkim || 'desconocido'}</span>
+                        <span class="badge ${dmarcClass}">DMARC: ${dmarc || 'desconocido'}</span>
+                    </p>
+
+                    <details>
+                        <summary>¿Qué significan SPF, DKIM y DMARC?</summary>
+                        <p><strong>SPF</strong>: Lista de servidores autorizados para enviar correo en nombre de un dominio.</p>
+                        <p><strong>DKIM</strong>: Firma criptográfica que garantiza que el mensaje no fue modificado y que fue firmado por el dominio.</p>
+                        <p><strong>DMARC</strong>: Política que indica cómo deben tratar los servidores de correo los mensajes que fallan SPF/DKIM.</p>
+                    </details>
+
+                    <h3>Motivos y explicaciones</h3>
+                    ${reasonsHtml}
+                </div>
+            `;
+        }
+
+        // --- Manejo del formulario ---
+
+        document.getElementById('analyzer-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const headersText = document.getElementById('headers').value || "";
+            if (headersText.trim() === "") {
+                renderResults(null);
+                return;
+            }
+            const result = analyzeHeaders(headersText);
+            renderResults(result);
+        });
+
+        // --- Ejemplos predefinidos ---
+
+        function loadExample(type) {
+            const textarea = document.getElementById('headers');
+            let content = '';
+
+            if (type === 'legitimo') {
+                content =
+'From: Google Account <no-reply@accounts.google.com>\n' +
+'Return-Path: <bounces+12345-abcde@google.com>\n' +
+'Reply-To: no-reply@accounts.google.com\n' +
+'Authentication-Results: spf=pass smtp.mailfrom=google.com; dkim=pass header.d=google.com; dmarc=pass\n' +
+'Message-ID: <abcdef123456@google.com>\n' +
+'Received: from mail-oi1-f175.google.com (mail-oi1-f175.google.com [209.85.167.175])\n';
+            } else if (type === 'phishing') {
+                content =
+'From: BancoEstado <notificaciones@bancoestado.cl>\n' +
+'Return-Path: <mailer@vps356.ru>\n' +
+'Reply-To: soporte.cliente@gmail.com\n' +
+'Authentication-Results: spf=fail smtp.mailfrom=vps356.ru; dkim=none; dmarc=none\n' +
+'Message-ID: <xyz123@vps356.ru>\n' +
+'Received: from vps356.ru (185.88.101.23)\n';
+            } else if (type === 'bec') {
+                content =
+'From: Juan Perez <juan.perez@empresa-real.com>\n' +
+'Return-Path: <juan.perez@empresa-real.com>\n' +
+'Reply-To: pagos@secure-payments.io\n' +
+'Authentication-Results: spf=pass smtp.mailfrom=empresa-real.com; dkim=pass header.d=empresa-real.com; dmarc=pass\n' +
+'Message-ID: <202601101200.12345@empresa-real.com>\n' +
+'Received: from [179.60.235.14] by mail.empresa-real.com with ESMTPSA\n';
+            }
+
+            textarea.value = content;
+            // Limpiar resultados anteriores al cargar un ejemplo
+            document.getElementById('results').innerHTML = "";
+        }
+    </script>
+</body>
+</html>
