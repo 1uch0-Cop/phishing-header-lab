@@ -1,84 +1,135 @@
 # Phishing Header Lab
 
-**Phishing Header Lab** es un recurso didáctico para el análisis de cabeceras de correo electrónico en el contexto de ciberseguridad. Permite estimar el riesgo de phishing basándose en:
+Laboratorio educativo para el análisis defensivo de cabeceras de correo electrónico.
 
-- Coherencia de remitentes (From / Return-Path / Reply-To)
-- Estado de autenticación (SPF / DKIM / DMARC)
-- Anomalías de dominio
-- Clasificación del nivel de riesgo (Bajo / Moderado / Alto)
+La herramienta examina indicadores básicos relacionados con:
 
-Este proyecto está diseñado para ser utilizado en unidades curriculares de ciberseguridad escolar, talleres formativos, cursos técnicos y actividades de blue teaming básico.
+- coherencia entre `From`, `Return-Path`, `Reply-To` y `Message-ID`;
+- resultados de autenticación SPF, DKIM y DMARC;
+- alineación entre dominios;
+- clasificación orientativa del riesgo;
+- escenarios de phishing y Business Email Compromise (BEC).
 
----
+## Propósito
 
-## Funcionalidad
+Este proyecto está diseñado para actividades educativas de ciberseguridad, talleres formativos, cursos técnicos y ejercicios introductorios de blue team.
 
-El laboratorio permite:
+No reemplaza el análisis realizado por especialistas ni constituye una herramienta automática de respuesta a incidentes.
 
-- Pegar cabeceras completas de correos reales
-- Analizar autenticación y coherencia de dominios
-- Obtener un nivel de riesgo
-- Ver explicaciones técnicas de cada hallazgo
-- Trabajar con ejemplos integrados (legítimo / phishing / BEC)
+## Privacidad
 
-Todo funciona **100% en el navegador del usuario**, sin enviar datos a servidores.
+El análisis se realiza localmente en el navegador. La aplicación no incorpora backend, telemetría, almacenamiento remoto ni código para transmitir las cabeceras ingresadas.
 
----
+Antes de utilizar una cabecera real, deben anonimizarse:
 
-## Ejemplos incluidos
+- nombres de personas;
+- direcciones de correo;
+- direcciones IP;
+- dominios internos;
+- identificadores de mensajes;
+- nombres de servidores;
+- cualquier otro dato personal o institucional.
 
-El laboratorio incorpora ejemplos predefinidos para uso docente:
+No se recomienda publicar cabeceras reales en capturas, repositorios, issues o materiales compartidos.
 
-- **Correo legítimo** (proveedor real)
-- **Phishing bancario**
-- **BEC (Business Email Compromise)**
+## Funcionalidades
 
-Estos permiten generar comparación inmediata entre escenarios.
+- Análisis de SPF, DKIM y DMARC.
+- Comparación de dominios entre campos relevantes.
+- Clasificación de riesgo bajo, moderado o alto.
+- Explicación educativa de cada hallazgo.
+- Ejemplos ficticios de correo legítimo, phishing y BEC.
+- Procesamiento completamente local.
+- Interfaz adaptable y compatible con modo oscuro.
+- Renderizado seguro de datos mediante nodos del DOM.
 
----
+## Ejemplos seguros
 
-## Uso en el aula (sugerencia docente)
+Los ejemplos incluidos utilizan exclusivamente:
 
-Actividad recomendada:
+- dominios reservados como `.example` y `.invalid`;
+- direcciones IP reservadas para documentación;
+- organizaciones, personas y servicios ficticios.
 
-1. Los estudiantes pegan cabeceras reales (o usan ejemplos).
-2. El laboratorio analiza y reporta puntuación + motivos.
-3. El docente solicita:
-   - Clasificación manual del caso
-   - Justificación del diagnóstico
-   - Identificación de técnicas usadas por el atacante
-4. Comparación final con herramientas automáticas y discusión.
+No representan incidentes, empresas ni infraestructuras reales.
 
-Resultados de aprendizaje:
+## Uso local
 
-- Identificar spoofing básico
-- Interpretar SPF/DKIM/DMARC
-- Evaluar coherencia de dominios
-- Desarrollar pensamiento crítico en ciberseguridad
+Clona el repositorio:
 
----
+```bash
+git clone https://github.com/1uch0-Cop/phishing-header-lab.git
+cd phishing-header-lab
+```
 
-## Tecnologías utilizadas
+Abre el archivo principal:
 
-- **HTML5** + **CSS3**
-- **JavaScript (ES6)**
-- No requiere backend
-- No requiere frameworks
-- No envía datos a internet
+```bash
+xdg-open index.html
+```
 
----
+También puede abrirse manualmente desde cualquier navegador moderno.
 
-## Publicación como página web
+## Uso educativo sugerido
 
-Este proyecto puede publicarse fácilmente mediante GitHub Pages:
+1. Seleccionar uno de los ejemplos ficticios.
+2. Revisar los campos principales de la cabecera.
+3. Analizar SPF, DKIM y DMARC.
+4. Comparar los dominios identificados.
+5. Formular una conclusión manual.
+6. Contrastar la conclusión con el resultado de la herramienta.
+7. Fundamentar si el caso corresponde a un correo legítimo, phishing o BEC.
 
-1. Ir a `Settings` → `Pages`
-2. Seleccionar:
-   - Branch: `main`
-   - Folder: `/root`
-3. Guardar y esperar la URL generada
+## Resultados de aprendizaje
 
----
+- Interpretar cabeceras básicas de correo.
+- Comprender SPF, DKIM y DMARC.
+- Reconocer discrepancias entre dominios.
+- Identificar señales iniciales de spoofing y BEC.
+- Aplicar criterios de privacidad al trabajar con evidencias.
+- Desarrollar pensamiento crítico en análisis defensivo.
 
-**Licencia**
-Uso educativo abierto. Puede reutilizarse, adaptarse y distribuirse en contextos escolares.
+## Tecnologías
+
+- HTML5
+- CSS3
+- JavaScript
+- Sin frameworks
+- Sin dependencias externas
+- Sin backend
+
+## Limitaciones
+
+La puntuación generada es orientativa.
+
+Un resultado bajo no garantiza que un mensaje sea legítimo, porque también deben analizarse:
+
+- contenido y contexto;
+- enlaces;
+- archivos adjuntos;
+- reputación de dominios e IP;
+- cadena completa de campos `Received`;
+- alineación real de SPF y DKIM;
+- comportamiento solicitado al destinatario.
+
+## Publicación con GitHub Pages
+
+Desde la configuración del repositorio:
+
+1. Abrir `Settings`.
+2. Seleccionar `Pages`.
+3. Elegir la rama `main`.
+4. Seleccionar la carpeta `/root`.
+5. Guardar la configuración.
+
+## Uso responsable
+
+Este proyecto tiene una finalidad educativa y defensiva. No debe utilizarse para suplantación, fraude, acceso no autorizado ni tratamiento indebido de información personal.
+
+## Licencia
+
+Copyright (C) 2026 1uch0-Cop
+
+Este proyecto se distribuye bajo la licencia GNU Affero General Public License, versión 3 o cualquier versión posterior: `AGPL-3.0-or-later`.
+
+Consulte el archivo [LICENSE](LICENSE).
